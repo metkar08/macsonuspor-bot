@@ -4,7 +4,7 @@ import tweepy  # X/Twitter için, ama şimdilik log'la tweet'leri (gerçek tweet
 from datetime import datetime
 import schedule
 import os
-from config import API_KEY  # API key'i config'den çek
+API_KEY = os.environ.get('API_KEY')  # Render'dan çekecek
 
 # API-Sports endpoint'leri
 BASE_URL = "https://v3.football.api-sports.io"
