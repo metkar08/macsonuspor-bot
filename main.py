@@ -4,32 +4,29 @@ import schedule
 import os
 from datetime import datetime
 
-# X/Twitter için Tweepy
+# Tweepy v5+ için
 import tweepy
 
-# Gizli key'ler Render environment variables'tan çekiliyor
-API_KEY = os.environ.get('FOOTBALL_API_KEY')  # API-Sports key
+# Gizli key'ler
+FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
 BEARER_TOKEN = os.environ.get('BEARER_TOKEN')
 CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
 CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
 ACCESS_TOKEN = os.environ.get('ACCESS_TOKEN')
 ACCESS_TOKEN_SECRET = os.environ.get('ACCESS_TOKEN_SECRET')
 
-# API-Sports ayarları
+# API-Sports
 BASE_URL = "https://v3.football.api-sports.io"
 HEADERS = {
-    'x-rapidapi-key': API_KEY,
+    'x-rapidapi-key': FOOTBALL_API_KEY,
     'x-rapidapi-host': 'v3.football.api-sports.io'
 }
 
-# Takip edilecek ligler (ID'ler)
-LEAGUES = [203, 204, 2, 3, 39, 140, 135, 78, 61]  # Süper Lig, 1.Lig, ŞL, AvL, PL, LaLiga, SerieA, Bundesliga, Ligue1
+LEAGUES = [203, 204, 2, 3, 39, 140, 135, 78, 61]
 
-# Maç durumlarını hafızada tut (değişiklikleri yakalamak için)
 last_scores = {}
-processed_matches = set()  # Maç sonu tekrar tweet atmasın
+processed_matches = set()
 
-# Türk takımları ve resmi hesapları
 TURK_TEAMS = {
     "Galatasaray": "@GalatasaraySK",
     "Fenerbahçe": "@Fenerbahce",
@@ -37,9 +34,7 @@ TURK_TEAMS = {
     "Trabzonspor": "@Trabzonspor",
     "Başakşehir": "@Basaksehir_FK",
     "Adana Demirspor": "@AdanaDemirspor",
-    "Alanyaspor": "@Alanyaspor",
-    "Antalyaspor": "@Antalyaspor",
-    # İstersen daha fazla ekle
+    # İstersen ekle
 }
 
 def get_turk_tag(team_name):
@@ -60,9 +55,10 @@ def send_tweet(text):
             consumer_key=CONSUMER_KEY,
             consumer_secret=CONSUMER_SECRET,
             access_token=ACCESS_TOKEN,
-            access_token_secret=ACCESS_TOKEN_SECRET
+            access_token_secret=ACCESS_TOKEN_SECRET,
+            wait_on_rate_limit=True
         )
-        client.create_tweet(text=text)
+        response = client.create_tweet(text=text)
         print(f"[{datetime.now()}] TWEET ATILDI: {text}")
     except Exception as e:
         print(f"[{datetime.now()}] Tweet hatası: {e}")
@@ -72,7 +68,7 @@ def check_matches():
         url = f"{BASE_URL}/fixtures/live"
         response = requests.get(url, headers=HEADERS)
         if response.status_code != 200:
-            print(f"API hatası: {response.status_code}")
+            print(f"API hatası: {response.status_code} - {response.text}")
             return
 
         matches = response.json()['response']
@@ -91,17 +87,14 @@ def check_matches():
 
             current_score = f"{score_home}-{score_away}"
 
-            # Hashtag ve etiket
             hashtag = generate_hashtag(home, away)
             home_tag = get_turk_tag(home)
             away_tag = get_turk_tag(away)
             tags = " ".join(filter(None, [home_tag, away_tag]))
 
-            # Gol tespiti
             prev_score = last_scores.get(fixture_id)
             if prev_score and prev_score != current_score and status not in ['FT', 'AET', 'PEN']:
                 goal_scorer = "Bilinmiyor"
-                # Son gol olayını bul
                 events = match.get('events', [])
                 for event in reversed(events):
                     if event['type'] == 'Goal':
@@ -110,7 +103,6 @@ def check_matches():
                 tweet = f"⚽ {minute}' GOOOL! {home} {current_score} {away} ({goal_scorer})\n{hashtag} #TrendyolSüperLig {tags}"
                 send_tweet(tweet)
 
-            # Maç sonu
             if status == 'FT' and fixture_id not in processed_matches:
                 goller = []
                 for event in match.get('events', []):
@@ -129,11 +121,10 @@ def check_matches():
     except Exception as e:
         print(f"Hata: {e}")
 
-# Her 45 saniyede bir kontrol et
 schedule.every(45).seconds.do(check_matches)
 
-# Başlangıçta test tweet (isteğe bağlı, sonra silersin)
-send_tweet("🤖 @macsonuspor bot aktif oldu! ⚽ Canlı gol ve maç sonu bildirimleri başlıyor... #MaçSonu")
+# Test tweet (çalıştığını görmek için)
+send_tweet("🤖 @macsonuspor bot aktif! ⚽ Gol ve maç sonu bildirimleri geliyor... #MaçSonu")
 
 if __name__ == "__main__":
     print("Bot başlatıldı, maçlar takip ediliyor...")
