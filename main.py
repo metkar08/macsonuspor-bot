@@ -131,3 +131,5 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(1)
+# Ekstra test tweet (deploy sonrası bir kere atsın, sonra silersin)
+send_tweet("🤖 Bot yeniden aktif! Test tweet – canlı gol bildirimleri geliyor ⚽ #Test #MaçSonu")
