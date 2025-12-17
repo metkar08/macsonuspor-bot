@@ -133,3 +133,7 @@ if __name__ == "__main__":
         time.sleep(1)
 # Ekstra test tweet (deploy sonrası bir kere atsın, sonra silersin)
 send_tweet("🤖 Bot yeniden aktif! Test tweet – canlı gol bildirimleri geliyor ⚽ #Test #MaçSonu")
+# Zorla test tweet (her deploy’da bir kere atsın)
+import datetime
+if datetime.datetime.now().hour % 2 == 0:  # Her çift saatte bir test atsın, sonra silersin
+    send_tweet("🤖 Bot çalışıyor lan! Test tweet – gol bildirimleri aktif ⚽ #MaçSonuTest")
