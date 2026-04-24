@@ -10,7 +10,6 @@ from keep_alive import keep_alive
 
 # Gizli key'ler Render environment'tan
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
-BEARER_TOKEN = os.environ.get('BEARER_TOKEN')
 CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
 CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
 ACCESS_TOKEN = os.environ.get('ACCESS_TOKEN')
@@ -23,8 +22,8 @@ HEADERS = {
     'x-rapidapi-host': 'v3.football.api-sports.io'
 }
 
-# Takip edilecek ligler
-LEAGUES = [203, 204, 2, 3, 39, 140, 135, 78, 61]  # Süper Lig, 1.Lig, ŞL, AvL, PL, LaLiga, SerieA, Bundesliga, Ligue1
+# Takip edilecek ligler (347 = Türkiye Kupası eklendi)
+LEAGUES = [203, 204, 347, 2, 3, 39, 140, 135, 78, 61]
 
 # Hafıza
 last_scores = {}
@@ -51,7 +50,6 @@ def get_turk_tag(team_name):
     return None
 
 def generate_hashtag(home, away):
-    # Daha iyi hashtag için manuel mapping
     mapping = {
         "Galatasaray": "GS", "Fenerbahçe": "FB", "Beşiktaş": "BJK", "Trabzonspor": "TS",
         "Başakşehir": "BAS", "Adana Demirspor": "ADS", "Manchester City": "MCI", "Liverpool": "LIV",
@@ -62,32 +60,31 @@ def generate_hashtag(home, away):
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    print(f"[{datetime.now()}] Tweet denemesi yapılıyor: {text[:50]}...")
+    print(f"[{datetime.now()}] Tweet denemesi yapılıyor: {text[:50]}...", flush=True)
     try:
+        # V2 API ile Tweet atma (Sadece 4 anahtar yeterli)
         client = tweepy.Client(
-            bearer_token=BEARER_TOKEN,
             consumer_key=CONSUMER_KEY,
             consumer_secret=CONSUMER_SECRET,
             access_token=ACCESS_TOKEN,
-            access_token_secret=ACCESS_TOKEN_SECRET,
-            wait_on_rate_limit=True
+            access_token_secret=ACCESS_TOKEN_SECRET
         )
         response = client.create_tweet(text=text)
-        print(f"[{datetime.now()}] TWEET BAŞARILI ATILDI")
+        print(f"[{datetime.now()}] TWEET BAŞARILI ATILDI: {response.data}", flush=True)
         return response
     except Exception as e:
-        print(f"[{datetime.now()}] TWEET HATA DETAY: {type(e).__name__}: {e}")
+        print(f"[{datetime.now()}] TWEET HATA DETAY: {type(e).__name__}: {e}", flush=True)
 
 def check_matches():
     try:
         url = f"{BASE_URL}/fixtures/live"
         response = requests.get(url, headers=HEADERS)
         if response.status_code != 200:
-            print(f"API hatası: {response.status_code} - {response.text}")
+            print(f"API hatası: {response.status_code} - {response.text}", flush=True)
             return
         
         matches = response.json()['response']
-        print(f"[{datetime.now()}] {len(matches)} canlı maç bulundu.")
+        print(f"[{datetime.now()}] {len(matches)} canlı maç bulundu.", flush=True)
         
         for match in matches:
             league_id = match['league']['id']
@@ -137,21 +134,22 @@ def check_matches():
             last_scores[fixture_id] = current_score
 
     except Exception as e:
-        print(f"Genel hata: {e}")
+        print(f"Genel hata: {e}", flush=True)
 
 # Her 45 saniyede kontrol
 schedule.every(45).seconds.do(check_matches)
 
 if __name__ == "__main__":
-    print("Sistem başlatılıyor...")
+    print("Sistem başlatılıyor...", flush=True)
     
-    # 1. ÖNCE WEB SUNUCUSUNU BAŞLAT (Render uyumasın diye)
+    # 1. ÖNCE WEB SUNUCUSUNU BAŞLAT
     keep_alive()
     
-    # 2. BAŞLANGIÇ TEST TWEETİ (Sistemin ayağa kalktığını doğrulamak için)
-    send_tweet("🤖 @macsonuspor bot aktif oldu! ⚽ Canlı skor ve maç sonu bildirimleri başlıyor... #MaçSonu")
+    # 2. BAŞLANGIÇ TEST TWEETİ (Her seferinde farklı olsun diye saat eklendi)
+    su_an = datetime.now().strftime("%H:%M:%S")
+    send_tweet(f"🤖 @macsonuspor bot sistemi aktif! [{su_an}] ⚽ Canlı skor takibi devrede.")
     
-    print("Bot döngüye girdi, maçlar takip ediliyor...")
+    print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     # 3. 45 SANİYELİK KONTROL DÖNGÜSÜ
     while True:
         schedule.run_pending()
