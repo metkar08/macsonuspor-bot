@@ -3,17 +3,14 @@ import time
 import schedule
 import os
 from datetime import datetime
-import tweepy
 
 # Render'ı uyanık tutacak web sunucusu modülü
 from keep_alive import keep_alive
 
 # Gizli key'ler Render environment'tan
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
-CONSUMER_KEY = os.environ.get('CONSUMER_KEY')
-CONSUMER_SECRET = os.environ.get('CONSUMER_SECRET')
-ACCESS_TOKEN = os.environ.get('ACCESS_TOKEN')
-ACCESS_TOKEN_SECRET = os.environ.get('ACCESS_TOKEN_SECRET')
+OPENTWEET_API_URL = os.environ.get('OPENTWEET_API_URL') # OpenTweet API Endpoint'in
+OPENTWEET_API_KEY = os.environ.get('OPENTWEET_API_KEY') # OpenTweet için yetki anahtarın
 
 # API-Sports ayarları
 BASE_URL = "https://v3.football.api-sports.io"
@@ -22,7 +19,7 @@ HEADERS = {
     'x-rapidapi-host': 'v3.football.api-sports.io'
 }
 
-# Takip edilecek ligler (347 = Türkiye Kupası eklendi)
+# Takip edilecek ligler (347 = Türkiye Kupası dahil)
 LEAGUES = [203, 204, 347, 2, 3, 39, 140, 135, 78, 61]
 
 # Hafıza
@@ -60,20 +57,31 @@ def generate_hashtag(home, away):
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    print(f"[{datetime.now()}] Tweet denemesi yapılıyor: {text[:50]}...", flush=True)
+    print(f"[{datetime.now()}] OpenTweet'e veri gönderiliyor: {text[:50]}...", flush=True)
     try:
-        # V2 API ile Tweet atma (Sadece 4 anahtar yeterli)
-        client = tweepy.Client(
-            consumer_key=CONSUMER_KEY,
-            consumer_secret=CONSUMER_SECRET,
-            access_token=ACCESS_TOKEN,
-            access_token_secret=ACCESS_TOKEN_SECRET
-        )
-        response = client.create_tweet(text=text)
-        print(f"[{datetime.now()}] TWEET BAŞARILI ATILDI: {response.data}", flush=True)
-        return response
+        # Eğer henüz URL girilmediyse loga uyarı basıp geçsin, kod çökmesin
+        if not OPENTWEET_API_URL:
+            print(f"[{datetime.now()}] UYARI: OPENTWEET_API_URL tanımlı değil! Mesaj: {text}", flush=True)
+            return
+
+        headers = {
+            "Authorization": f"Bearer {OPENTWEET_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "content": text
+        }
+        
+        response = requests.post(OPENTWEET_API_URL, json=payload, headers=headers)
+        
+        if response.status_code in [200, 201]:
+            print(f"[{datetime.now()}] OPENTWEET BAŞARILI: Sistem kabul etti.", flush=True)
+        else:
+            print(f"[{datetime.now()}] OPENTWEET HATA: {response.status_code} - {response.text}", flush=True)
+            
     except Exception as e:
-        print(f"[{datetime.now()}] TWEET HATA DETAY: {type(e).__name__}: {e}", flush=True)
+        print(f"[{datetime.now()}] OPENTWEET BAĞLANTI HATASI: {e}", flush=True)
 
 def check_matches():
     try:
@@ -145,9 +153,9 @@ if __name__ == "__main__":
     # 1. ÖNCE WEB SUNUCUSUNU BAŞLAT
     keep_alive()
     
-    # 2. BAŞLANGIÇ TEST TWEETİ (Her seferinde farklı olsun diye saat eklendi)
+    # 2. BAŞLANGIÇ TEST MESAJI
     su_an = datetime.now().strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor bot sistemi aktif! [{su_an}] ⚽ Canlı skor takibi devrede.")
+    send_tweet(f"🤖 @macsonuspor bot sistemi OpenTweet'e bağlandı! [{su_an}] ⚽ Canlı skor takibi devrede.")
     
     print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     # 3. 45 SANİYELİK KONTROL DÖNGÜSÜ
