@@ -10,10 +10,11 @@ from keep_alive import keep_alive
 # --- API ANAHTARLARI ---
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
 
-# 3. Parti Twitter API (RapidAPI) Ayarları
-RAPIDAPI_TWITTER_URL = os.environ.get('RAPIDAPI_TWITTER_URL') # Örn: https://twttr-api.p.rapidapi.com/create-tweet
-RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY') # RapidAPI'den aldığın x-rapidapi-key
-RAPIDAPI_HOST = os.environ.get('RAPIDAPI_HOST') # Örn: twttr-api.p.rapidapi.com
+# Zernio API Ayarları
+ZERNIO_API_KEY = os.environ.get('ZERNIO_API_KEY') # Zernio'dan aldığın sk_... ile başlayan şifre
+# Zernio dokümantasyonundaki post atma uç noktası (Endpoint). 
+# Genelde şöyledir, ama duruma göre Render'dan değiştirebiliriz:
+ZERNIO_API_URL = os.environ.get('ZERNIO_API_URL', 'https://api.zernio.com/v1/posts') 
 
 # --- API SPORTS AYARLARI ---
 BASE_URL = "https://v3.football.api-sports.io"
@@ -29,57 +30,14 @@ LEAGUES = [203, 204, 347, 2, 3, 39, 140, 135, 78, 61]
 last_scores = {}
 processed_matches = set()
 
-# --- GENİŞLETİLMİŞ TAKIM ETİKETLERİ (Türkiye ve Avrupa) ---
+# --- TAKIM ETİKETLERİ ---
 TEAM_TAGS = {
-    # Türkiye
-    "Fenerbahçe": "@Fenerbahce",
-    "Galatasaray": "@GalatasaraySK",
-    "Beşiktaş": "@Besiktas",
-    "Trabzonspor": "@Trabzonspor",
-    "Başakşehir": "@Basaksehir_FK",
-    "Adana Demirspor": "@AdanaDemirspor",
-    "Alanyaspor": "@Alanyaspor",
-    "Antalyaspor": "@Antalyaspor",
-    "Kasımpaşa": "@KasimpasaSK",
-    "Konyaspor": "@Konyaspor",
-    "Samsunspor": "@Samsunspor",
-    "Göztepe": "@Goztepe",
-    "Rizespor": "@CRizesporAS",
-    "Sivasspor": "@Sivasspor",
-    "Kayserispor": "@KayserisporFK",
-    "Gaziantep FK": "@GaziantepFK",
-    "Hatayspor": "@Hatayspor_FK",
-    "Eyüpspor": "@Eyupspor",
-    
-    # İngiltere
-    "Manchester City": "@ManCity",
-    "Arsenal": "@Arsenal",
-    "Liverpool": "@LFC",
-    "Chelsea": "@ChelseaFC",
-    "Manchester United": "@ManUtd",
-    "Tottenham": "@SpursOfficial",
-    
-    # İspanya
-    "Real Madrid": "@realmadrid",
-    "Barcelona": "@FCBarcelona",
-    "Atletico Madrid": "@Atleti",
-    
-    # İtalya
-    "Inter": "@Inter",
-    "AC Milan": "@acmilan",
-    "Juventus": "@juventusfc",
-    "Napoli": "@sscnapoli",
-    "AS Roma": "@OfficialASRoma",
-    
-    # Almanya
-    "Bayern Munich": "@FCBayern",
-    "Borussia Dortmund": "@BVB",
-    "Bayer Leverkusen": "@bayer04fussball",
-    
-    # Fransa
-    "Paris Saint Germain": "@PSG_inside",
-    "Marseille": "@OM_Officiel",
-    "Monaco": "@AS_Monaco"
+    "Fenerbahçe": "@Fenerbahce", "Galatasaray": "@GalatasaraySK", "Beşiktaş": "@Besiktas", "Trabzonspor": "@Trabzonspor",
+    "Başakşehir": "@Basaksehir_FK", "Adana Demirspor": "@AdanaDemirspor", "Alanyaspor": "@Alanyaspor", "Antalyaspor": "@Antalyaspor",
+    "Kasımpaşa": "@KasimpasaSK", "Konyaspor": "@Konyaspor", "Samsunspor": "@Samsunspor", "Göztepe": "@Goztepe",
+    "Rizespor": "@CRizesporAS", "Sivasspor": "@Sivasspor", "Kayserispor": "@KayserisporFK", "Gaziantep FK": "@GaziantepFK",
+    "Real Madrid": "@realmadrid", "Barcelona": "@FCBarcelona", "Manchester City": "@ManCity", "Liverpool": "@LFC",
+    "Bayern Munich": "@FCBayern", "Borussia Dortmund": "@BVB", "Paris Saint Germain": "@PSG_inside", "Inter": "@Inter"
 }
 
 def get_team_tag(team_name):
@@ -91,43 +49,40 @@ def get_team_tag(team_name):
 def generate_hashtag(home, away):
     mapping = {
         "Fenerbahçe": "FB", "Galatasaray": "GS", "Beşiktaş": "BJK", "Trabzonspor": "TS",
-        "Manchester City": "MCI", "Liverpool": "LIV", "Real Madrid": "RMA", "Barcelona": "BAR",
-        "Bayern Munich": "BAY", "Borussia Dortmund": "BVB", "Paris Saint Germain": "PSG"
+        "Manchester City": "MCI", "Liverpool": "LIV", "Real Madrid": "RMA", "Barcelona": "BAR"
     }
-    
-    # Özel kısaltma yoksa boşlukları silip hashtag yapar (Örn: #AstonVilla)
     home_short = mapping.get(home, home.replace(" ", ""))
     away_short = mapping.get(away, away.replace(" ", ""))
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    print(f"[{datetime.now()}] RapidAPI üzerinden Tweet atılıyor: {text[:50]}...", flush=True)
+    print(f"[{datetime.now()}] Zernio üzerinden Post gönderiliyor: {text[:50]}...", flush=True)
     try:
-        if not RAPIDAPI_TWITTER_URL:
-            print(f"[{datetime.now()}] UYARI: RAPIDAPI_TWITTER_URL tanımlı değil!", flush=True)
+        if not ZERNIO_API_KEY:
+            print(f"[{datetime.now()}] UYARI: ZERNIO_API_KEY Render'da tanımlı değil!", flush=True)
             return
 
         headers = {
-            "x-rapidapi-key": RAPIDAPI_KEY,
-            "x-rapidapi-host": RAPIDAPI_HOST,
+            "Authorization": f"Bearer {ZERNIO_API_KEY}",
             "Content-Type": "application/json"
         }
         
-        # API'nin beklediği JSON formatı. 
-        # Çoğu API "text" parametresi kullanır, çalışmazsa bunu "tweet" olarak değiştirebiliriz.
+        # Çoğu modern sosyal medya API'si bu yapıyı kullanır. 
+        # Eğer Zernio dokümantasyonu farklı bir parametre adı istiyorsa (örneğin 'text' yerine 'content') bunu güncelleyebiliriz.
         payload = {
-            "text": text 
+            "content": text,
+            "platforms": ["twitter"] # Eğer birden fazla hesap bağlıysa sadece X'e gitmesini garantilemek için
         }
         
-        response = requests.post(RAPIDAPI_TWITTER_URL, json=payload, headers=headers)
+        response = requests.post(ZERNIO_API_URL, json=payload, headers=headers)
         
         if response.status_code in [200, 201]:
-            print(f"[{datetime.now()}] TWEET BAŞARILI: Sistem kabul etti.", flush=True)
+            print(f"[{datetime.now()}] ZERNIO BAŞARILI: Mesaj hedefe ulaştı! 🎉", flush=True)
         else:
-            print(f"[{datetime.now()}] TWEET HATA: {response.status_code} - {response.text}", flush=True)
+            print(f"[{datetime.now()}] ZERNIO HATA: {response.status_code} - {response.text}", flush=True)
             
     except Exception as e:
-        print(f"[{datetime.now()}] API BAĞLANTI HATASI: {e}", flush=True)
+        print(f"[{datetime.now()}] ZERNIO BAĞLANTI HATASI: {e}", flush=True)
 
 def check_matches():
     try:
@@ -196,15 +151,13 @@ schedule.every(45).seconds.do(check_matches)
 if __name__ == "__main__":
     print("Sistem başlatılıyor...", flush=True)
     
-    # 1. ÖNCE WEB SUNUCUSUNU BAŞLAT
     keep_alive()
     
-    # 2. BAŞLANGIÇ TEST MESAJI
+    # Sistemin ayağa kalktığını göstermek için Zernio üzerinden ilk test mesajı
     su_an = datetime.now().strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor bot sistemi RapidAPI ile aktif! [{su_an}] ⚽ Canlı skor takibi devrede.")
+    send_tweet(f"🤖 @macsonuspor bot sistemi Zernio altyapısı ile aktif edildi! [{su_an}] ⚽ Canlı skor takibi devrede.")
     
     print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
-    # 3. 45 SANİYELİK KONTROL DÖNGÜSÜ
     while True:
         schedule.run_pending()
         time.sleep(1)
