@@ -11,7 +11,7 @@ from keep_alive import keep_alive
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
 
 # Zernio API Ayarları
-ZERNIO_API_KEY = os.environ.get('ZERNIO_API_KEY') # Zernio'dan aldığın sk_... ile başlayan şifre
+ZERNIO_API_KEY = os.environ.get('ZERNIO_API_KEY')
 ZERNIO_API_URL = os.environ.get('ZERNIO_API_URL', 'https://api.zernio.com/v1/posts') 
 
 # --- API SPORTS AYARLARI ---
@@ -21,7 +21,7 @@ HEADERS = {
     'x-rapidapi-host': 'v3.football.api-sports.io'
 }
 
-# Ligler: TR Süper Lig (203), 1.Lig (204), Kupa (347), ŞL (2), AvL (3), PL (39), LaLiga (140), SerieA (135), Bundesliga (78), Ligue1 (61)
+# Takip Edilen Ligler
 LEAGUES = [203, 204, 347, 2, 3, 39, 140, 135, 78, 61]
 
 # --- HAFIZA ---
@@ -54,7 +54,7 @@ def generate_hashtag(home, away):
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    print(f"[{datetime.now()}] Zernio üzerinden Post gönderiliyor: {text[:50]}...", flush=True)
+    print(f"[{datetime.now()}] Zernio üzerinden Yayınlama yapılıyor: {text[:50]}...", flush=True)
     try:
         if not ZERNIO_API_KEY:
             print(f"[{datetime.now()}] UYARI: ZERNIO_API_KEY Render'da tanımlı değil!", flush=True)
@@ -65,14 +65,14 @@ def send_tweet(text):
             "Content-Type": "application/json"
         }
         
-        # Zernio'nun istediği kusursuz format: Taslağa atma, direkt yayınla!
+        # Zernio'nun beklediği tam yayınlama formatı
         payload = {
             "content": text,
-            "status": "published",  
+            "status": "published",  # Taslak yerine doğrudan yayınla
             "platforms": [
                 {
                     "platform": "twitter",
-                    "accountId": "69ef66bb985e734bf3c0b515"
+                    "accountId": "69ef66bb985e734bf3c0b515" # Senin özel hesap ID'n
                 }
             ]
         }
@@ -80,7 +80,7 @@ def send_tweet(text):
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers)
         
         if response.status_code in [200, 201]:
-            print(f"[{datetime.now()}] ZERNIO BAŞARILI: Mesaj hedefe ulaştı ve yayınlandı! 🎉", flush=True)
+            print(f"[{datetime.now()}] ZERNIO BAŞARILI: Tweet X'e fırlatıldı! 🎉", flush=True)
         else:
             print(f"[{datetime.now()}] ZERNIO HATA: {response.status_code} - {response.text}", flush=True)
             
@@ -95,8 +95,8 @@ def check_matches():
             print(f"API hatası: {response.status_code} - {response.text}", flush=True)
             return
         
-        matches = response.json()['response']
-        print(f"[{datetime.now()}] {len(matches)} canlı maç bulundu.", flush=True)
+        matches = response.json().get('response', [])
+        print(f"[{datetime.now()}] {len(matches)} canlı maç kontrol edildi.", flush=True)
         
         for match in matches:
             league_id = match['league']['id']
@@ -148,19 +148,19 @@ def check_matches():
     except Exception as e:
         print(f"Genel hata: {e}", flush=True)
 
-# Her 90 saniyede kontrol
-schedule.every(90).seconds.do(check_matches)
+# 3 DAKİKADA BİR KONTROL (Kredileri korumak ve güvenli yayın için)
+schedule.every(3).minutes.do(check_matches)
 
 if __name__ == "__main__":
-    print("Sistem başlatılıyor...", flush=True)
+    print("Sistem başlatılıyor (3 dakikalık döngü aktif)...", flush=True)
     
     keep_alive()
     
-    # Sistemin ayağa kalktığını göstermek için Zernio üzerinden ilk test mesajı
+    # Sistemin ayağa kalktığını göstermek için ilk mesaj
     su_an = datetime.now().strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor bot sistemi Zernio altyapısı ile tam otomatik aktif edildi! [{su_an}] ⚽")
+    send_tweet(f"🤖 @macsonuspor sistemi aktif edildi! [{su_an}] ⚽ Canlı skor takibi ve otomatik yayınlama devrede.")
     
-    print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
+    print("Bot döngüye girdi, maçlar 3 dakikada bir kontrol ediliyor...", flush=True)
     while True:
         schedule.run_pending()
         time.sleep(1)
