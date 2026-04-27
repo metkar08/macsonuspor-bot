@@ -12,8 +12,6 @@ FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
 
 # Zernio API Ayarları
 ZERNIO_API_KEY = os.environ.get('ZERNIO_API_KEY') # Zernio'dan aldığın sk_... ile başlayan şifre
-# Zernio dokümantasyonundaki post atma uç noktası (Endpoint). 
-# Genelde şöyledir, ama duruma göre Render'dan değiştirebiliriz:
 ZERNIO_API_URL = os.environ.get('ZERNIO_API_URL', 'https://api.zernio.com/v1/posts') 
 
 # --- API SPORTS AYARLARI ---
@@ -67,11 +65,9 @@ def send_tweet(text):
             "Content-Type": "application/json"
         }
         
-        # Çoğu modern sosyal medya API'si bu yapıyı kullanır. 
-        # Eğer Zernio dokümantasyonu farklı bir parametre adı istiyorsa (örneğin 'text' yerine 'content') bunu güncelleyebiliriz.
+        # Hata veren platforms kısmını kaldırdık. Direkt content gönderiyoruz.
         payload = {
-            "content": text,
-            "platforms": ["twitter"] # Eğer birden fazla hesap bağlıysa sadece X'e gitmesini garantilemek için
+            "content": text
         }
         
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers)
