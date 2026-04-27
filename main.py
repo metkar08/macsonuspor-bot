@@ -7,29 +7,33 @@ from datetime import datetime
 # Render'ı uyanık tutacak web sunucusu modülü
 from keep_alive import keep_alive
 
-# Gizli key'ler Render environment'tan
+# --- API ANAHTARLARI ---
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
-OPENTWEET_API_URL = os.environ.get('OPENTWEET_API_URL') # OpenTweet API Endpoint'in
-OPENTWEET_API_KEY = os.environ.get('OPENTWEET_API_KEY') # OpenTweet için yetki anahtarın
 
-# API-Sports ayarları
+# 3. Parti Twitter API (RapidAPI) Ayarları
+RAPIDAPI_TWITTER_URL = os.environ.get('RAPIDAPI_TWITTER_URL') # Örn: https://twttr-api.p.rapidapi.com/create-tweet
+RAPIDAPI_KEY = os.environ.get('RAPIDAPI_KEY') # RapidAPI'den aldığın x-rapidapi-key
+RAPIDAPI_HOST = os.environ.get('RAPIDAPI_HOST') # Örn: twttr-api.p.rapidapi.com
+
+# --- API SPORTS AYARLARI ---
 BASE_URL = "https://v3.football.api-sports.io"
 HEADERS = {
     'x-rapidapi-key': FOOTBALL_API_KEY,
     'x-rapidapi-host': 'v3.football.api-sports.io'
 }
 
-# Takip edilecek ligler (347 = Türkiye Kupası dahil)
+# Ligler: TR Süper Lig (203), 1.Lig (204), Kupa (347), ŞL (2), AvL (3), PL (39), LaLiga (140), SerieA (135), Bundesliga (78), Ligue1 (61)
 LEAGUES = [203, 204, 347, 2, 3, 39, 140, 135, 78, 61]
 
-# Hafıza
+# --- HAFIZA ---
 last_scores = {}
 processed_matches = set()
 
-# Türk takımları resmi etiketleri
-TURK_TEAMS = {
-    "Galatasaray": "@GalatasaraySK",
+# --- GENİŞLETİLMİŞ TAKIM ETİKETLERİ (Türkiye ve Avrupa) ---
+TEAM_TAGS = {
+    # Türkiye
     "Fenerbahçe": "@Fenerbahce",
+    "Galatasaray": "@GalatasaraySK",
     "Beşiktaş": "@Besiktas",
     "Trabzonspor": "@Trabzonspor",
     "Başakşehir": "@Basaksehir_FK",
@@ -37,51 +41,93 @@ TURK_TEAMS = {
     "Alanyaspor": "@Alanyaspor",
     "Antalyaspor": "@Antalyaspor",
     "Kasımpaşa": "@KasimpasaSK",
-    "Konyaspor": "@Konyaspor"
+    "Konyaspor": "@Konyaspor",
+    "Samsunspor": "@Samsunspor",
+    "Göztepe": "@Goztepe",
+    "Rizespor": "@CRizesporAS",
+    "Sivasspor": "@Sivasspor",
+    "Kayserispor": "@KayserisporFK",
+    "Gaziantep FK": "@GaziantepFK",
+    "Hatayspor": "@Hatayspor_FK",
+    "Eyüpspor": "@Eyupspor",
+    
+    # İngiltere
+    "Manchester City": "@ManCity",
+    "Arsenal": "@Arsenal",
+    "Liverpool": "@LFC",
+    "Chelsea": "@ChelseaFC",
+    "Manchester United": "@ManUtd",
+    "Tottenham": "@SpursOfficial",
+    
+    # İspanya
+    "Real Madrid": "@realmadrid",
+    "Barcelona": "@FCBarcelona",
+    "Atletico Madrid": "@Atleti",
+    
+    # İtalya
+    "Inter": "@Inter",
+    "AC Milan": "@acmilan",
+    "Juventus": "@juventusfc",
+    "Napoli": "@sscnapoli",
+    "AS Roma": "@OfficialASRoma",
+    
+    # Almanya
+    "Bayern Munich": "@FCBayern",
+    "Borussia Dortmund": "@BVB",
+    "Bayer Leverkusen": "@bayer04fussball",
+    
+    # Fransa
+    "Paris Saint Germain": "@PSG_inside",
+    "Marseille": "@OM_Officiel",
+    "Monaco": "@AS_Monaco"
 }
 
-def get_turk_tag(team_name):
-    for name, tag in TURK_TEAMS.items():
+def get_team_tag(team_name):
+    for name, tag in TEAM_TAGS.items():
         if name in team_name:
             return tag
     return None
 
 def generate_hashtag(home, away):
     mapping = {
-        "Galatasaray": "GS", "Fenerbahçe": "FB", "Beşiktaş": "BJK", "Trabzonspor": "TS",
-        "Başakşehir": "BAS", "Adana Demirspor": "ADS", "Manchester City": "MCI", "Liverpool": "LIV",
-        "Real Madrid": "RMA", "Barcelona": "BAR", "Bayern München": "BAY", "Borussia Dortmund": "BVB"
+        "Fenerbahçe": "FB", "Galatasaray": "GS", "Beşiktaş": "BJK", "Trabzonspor": "TS",
+        "Manchester City": "MCI", "Liverpool": "LIV", "Real Madrid": "RMA", "Barcelona": "BAR",
+        "Bayern Munich": "BAY", "Borussia Dortmund": "BVB", "Paris Saint Germain": "PSG"
     }
-    home_short = mapping.get(home, "".join(w[0] for w in home.split()[:2]).upper())
-    away_short = mapping.get(away, "".join(w[0] for w in away.split()[:2]).upper())
+    
+    # Özel kısaltma yoksa boşlukları silip hashtag yapar (Örn: #AstonVilla)
+    home_short = mapping.get(home, home.replace(" ", ""))
+    away_short = mapping.get(away, away.replace(" ", ""))
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    print(f"[{datetime.now()}] OpenTweet'e veri gönderiliyor: {text[:50]}...", flush=True)
+    print(f"[{datetime.now()}] RapidAPI üzerinden Tweet atılıyor: {text[:50]}...", flush=True)
     try:
-        # Eğer henüz URL girilmediyse loga uyarı basıp geçsin, kod çökmesin
-        if not OPENTWEET_API_URL:
-            print(f"[{datetime.now()}] UYARI: OPENTWEET_API_URL tanımlı değil! Mesaj: {text}", flush=True)
+        if not RAPIDAPI_TWITTER_URL:
+            print(f"[{datetime.now()}] UYARI: RAPIDAPI_TWITTER_URL tanımlı değil!", flush=True)
             return
 
         headers = {
-            "Authorization": f"Bearer {OPENTWEET_API_KEY}",
+            "x-rapidapi-key": RAPIDAPI_KEY,
+            "x-rapidapi-host": RAPIDAPI_HOST,
             "Content-Type": "application/json"
         }
         
+        # API'nin beklediği JSON formatı. 
+        # Çoğu API "text" parametresi kullanır, çalışmazsa bunu "tweet" olarak değiştirebiliriz.
         payload = {
-            "content": text
+            "text": text 
         }
         
-        response = requests.post(OPENTWEET_API_URL, json=payload, headers=headers)
+        response = requests.post(RAPIDAPI_TWITTER_URL, json=payload, headers=headers)
         
         if response.status_code in [200, 201]:
-            print(f"[{datetime.now()}] OPENTWEET BAŞARILI: Sistem kabul etti.", flush=True)
+            print(f"[{datetime.now()}] TWEET BAŞARILI: Sistem kabul etti.", flush=True)
         else:
-            print(f"[{datetime.now()}] OPENTWEET HATA: {response.status_code} - {response.text}", flush=True)
+            print(f"[{datetime.now()}] TWEET HATA: {response.status_code} - {response.text}", flush=True)
             
     except Exception as e:
-        print(f"[{datetime.now()}] OPENTWEET BAĞLANTI HATASI: {e}", flush=True)
+        print(f"[{datetime.now()}] API BAĞLANTI HATASI: {e}", flush=True)
 
 def check_matches():
     try:
@@ -109,8 +155,8 @@ def check_matches():
             current_score = f"{score_home}-{score_away}"
 
             hashtag = generate_hashtag(home, away)
-            home_tag = get_turk_tag(home)
-            away_tag = get_turk_tag(away)
+            home_tag = get_team_tag(home)
+            away_tag = get_team_tag(away)
             tags = " ".join(filter(None, [home_tag, away_tag]))
 
             # Gol tespiti
@@ -122,7 +168,7 @@ def check_matches():
                     if event['type'] == 'Goal':
                         goal_scorer = event['player']['name']
                         break
-                tweet = f"⚽ {minute}' GOOOL! {home} {current_score} {away} ({goal_scorer})\n{hashtag} #TrendyolSüperLig {tags}"
+                tweet = f"⚽ {minute}' GOOOL! {home} {current_score} {away} ({goal_scorer})\n{hashtag} {tags}"
                 send_tweet(tweet)
 
             # Maç sonu
@@ -135,7 +181,7 @@ def check_matches():
                         dak_str = f"{dak}+{ekstra}'" if ekstra else f"{dak}'"
                         goller.append(f"{event['player']['name']} {dak_str}")
                 gol_text = "\nGoller: " + ", ".join(goller) if goller else ""
-                tweet = f"🏁 MAÇ SONUUU!\n{home} {score_home}-{score_away} {away}{gol_text}\n{hashtag} #TrendyolSüperLig {tags}"
+                tweet = f"🏁 MAÇ SONUUU!\n{home} {score_home}-{score_away} {away}{gol_text}\n{hashtag} {tags}"
                 send_tweet(tweet)
                 processed_matches.add(fixture_id)
 
@@ -155,7 +201,7 @@ if __name__ == "__main__":
     
     # 2. BAŞLANGIÇ TEST MESAJI
     su_an = datetime.now().strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor bot sistemi OpenTweet'e bağlandı! [{su_an}] ⚽ Canlı skor takibi devrede.")
+    send_tweet(f"🤖 @macsonuspor bot sistemi RapidAPI ile aktif! [{su_an}] ⚽ Canlı skor takibi devrede.")
     
     print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     # 3. 45 SANİYELİK KONTROL DÖNGÜSÜ
