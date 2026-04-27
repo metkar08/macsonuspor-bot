@@ -168,3 +168,46 @@ if __name__ == "__main__":
     while True:
         schedule.run_pending()
         time.sleep(1)
+def check_matches():
+    global LAST_CLEANUP, last_scores, processed_matches
+    
+    bugun = datetime.now(TR_TZ).date()
+    if bugun > LAST_CLEANUP:
+        last_scores.clear()
+        processed_matches.clear()
+        LAST_CLEANUP = bugun
+        print(f"[{bugun}] Günlük temizlik yapıldı.", flush=True)
+
+    try:
+        url = f"{BASE_URL}/fixtures/live"
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        
+        if response.status_code != 200:
+            print(f"API Hatası: {response.status_code}", flush=True)
+            return
+        
+        data = response.json()
+        matches = data.get('response', [])
+        
+        saat_simdi = datetime.now(TR_TZ).strftime('%H:%M:%S')
+        print(f"[{saat_simdi}] API'den toplam {len(matches)} canlı maç geldi.", flush=True)
+
+        # --- DEBUG SATIRI BAŞLANGIÇ ---
+        if len(matches) == 0:
+             print(f"[{saat_simdi}] UYARI: API şu an canlı maç bildirmiyor. Yanıt: {data}", flush=True)
+        # --- DEBUG SATIRI BİTİŞ ---
+        
+        for match in matches:
+            home_name = match['teams']['home']['name']
+            away_name = match['teams']['away']['name']
+            
+            # --- DEBUG: BOTUN GÖRDÜĞÜ MAÇLARI LOGA BAS ---
+            print(f"[{saat_simdi}] Taranan Maç: {home_name} - {away_name}", flush=True)
+            
+            home_tag = get_team_tag(home_name)
+            away_tag = get_team_tag(away_name)
+
+            if home_tag or away_tag:
+                # Buradan sonrası zaten senin kodunla aynı...
+                fixture_id = match['fixture']['id']
+                # ... devam ediyor ...
