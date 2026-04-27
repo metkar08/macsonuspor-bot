@@ -57,7 +57,6 @@ def generate_hashtag(home, away):
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    # Loglarda da Türkiye saatini görebilmek için TR_TZ kullanıyoruz
     saat_log = datetime.now(TR_TZ).strftime('%H:%M:%S')
     print(f"[{saat_log}] Zernio üzerinden CANLI yayınlama yapılıyor...", flush=True)
     
@@ -71,10 +70,9 @@ def send_tweet(text):
             "Content-Type": "application/json"
         }
         
-        # Zernio Dokümantasyonuna uygun (camelCase) garantili yayınlama komutu
         payload = {
             "content": text,
-            "publishNow": True,  # Alt tire yok, 'N' büyük! Zernio'nun sevdiği format bu.
+            "publishNow": True, 
             "platforms": [
                 {
                     "platform": "twitter",
@@ -161,9 +159,9 @@ if __name__ == "__main__":
     print("Sistem başlatılıyor...", flush=True)
     keep_alive()
     
-    # Türkiye saatini alıp metne ekliyoruz
+    # Test tweetini KİLİTLEDİK! Sadece Render loglarında sessizce bilgi verecek.
     su_an = datetime.now(TR_TZ).strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor sistemi aktif! [{su_an}] ⚽ Maç skorları 90 saniyede bir kontrol ediliyor.")
+    print(f"[{su_an}] Bot sessizce uyandı. Sadece gol olduğunda tweet atılacak.", flush=True)
     
     print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     while True:
