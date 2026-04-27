@@ -12,20 +12,15 @@ TR_TZ = timezone(timedelta(hours=3))
 
 # --- API ANAHTARLARI ---
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
-
-# Zernio API Ayarları
 ZERNIO_API_KEY = os.environ.get('ZERNIO_API_KEY')
 ZERNIO_API_URL = os.environ.get('ZERNIO_API_URL', 'https://api.zernio.com/v1/posts') 
 
 # --- API SPORTS AYARLARI ---
 BASE_URL = "https://v3.football.api-sports.io"
 HEADERS = {
-    'x-rapidapi-key': FOOTBALL_API_KEY,
+    'x-rapidapi-key': FOOTBALL_API_KEY, # API-Sports anahtarın buraya gelecek
     'x-rapidapi-host': 'v3.football.api-sports.io'
 }
-
-# Takip Edilen Ligler
-LEAGUES = [203, 204, 347, 2, 3, 39, 140, 135, 78, 61]
 
 # --- HAFIZA ---
 last_scores = {}
@@ -34,9 +29,8 @@ processed_matches = set()
 # --- TAKIM ETİKETLERİ ---
 TEAM_TAGS = {
     "Fenerbahçe": "@Fenerbahce", "Galatasaray": "@GalatasaraySK", "Beşiktaş": "@Besiktas", "Trabzonspor": "@Trabzonspor",
-    "Başakşehir": "@Basaksehir_FK", "Adana Demirspor": "@AdanaDemirspor", "Alanyaspor": "@Alanyaspor", "Antalyaspor": "@Antalyaspor",
-    "Kasımpaşa": "@KasimpasaSK", "Konyaspor": "@Konyaspor", "Samsunspor": "@Samsunspor", "Göztepe": "@Goztepe",
-    "Rizespor": "@CRizesporAS", "Sivasspor": "@Sivasspor", "Kayserispor": "@KayserisporFK", "Gaziantep FK": "@GaziantepFK",
+    "Konyaspor": "@Konyaspor", "Samsunspor": "@Samsunspor", "Göztepe": "@Goztepe", "Alanyaspor": "@Alanyaspor",
+    "Antalyaspor": "@Antalyaspor", "Başakşehir": "@Basaksehir_FK", "Adana Demirspor": "@AdanaDemirspor",
     "Real Madrid": "@realmadrid", "Barcelona": "@FCBarcelona", "Manchester City": "@ManCity", "Liverpool": "@LFC",
     "Bayern Munich": "@FCBayern", "Borussia Dortmund": "@BVB", "Paris Saint Germain": "@PSG_inside", "Inter": "@Inter"
 }
@@ -47,49 +41,26 @@ def get_team_tag(team_name):
             return tag
     return None
 
-def generate_hashtag(home, away):
-    mapping = {
-        "Fenerbahçe": "FB", "Galatasaray": "GS", "Beşiktaş": "BJK", "Trabzonspor": "TS",
-        "Manchester City": "MCI", "Liverpool": "LIV", "Real Madrid": "RMA", "Barcelona": "BAR"
-    }
-    home_short = mapping.get(home, home.replace(" ", ""))
-    away_short = mapping.get(away, away.replace(" ", ""))
-    return f"#{home_short}{away_short}"
-
 def send_tweet(text):
     saat_log = datetime.now(TR_TZ).strftime('%H:%M:%S')
-    print(f"[{saat_log}] Zernio üzerinden CANLI yayınlama yapılıyor...", flush=True)
-    
+    print(f"[{saat_log}] Zernio üzerinden yayınlama denemesi...", flush=True)
     try:
-        if not ZERNIO_API_KEY:
-            print(f"[{saat_log}] UYARI: ZERNIO_API_KEY Render'da tanımlı değil!", flush=True)
-            return
-
         headers = {
             "Authorization": f"Bearer {ZERNIO_API_KEY}",
             "Content-Type": "application/json"
         }
-        
         payload = {
             "content": text,
-            "publishNow": True, 
-            "platforms": [
-                {
-                    "platform": "twitter",
-                    "accountId": "69ef66bb985e734bf3c0b515"
-                }
-            ]
+            "publishNow": True,
+            "platforms": [{"platform": "twitter", "accountId": "69ef66bb985e734bf3c0b515"}]
         }
-        
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers)
-        
         if response.status_code in [200, 201]:
-            print(f"[{saat_log}] ZERNIO BAŞARILI: Gönderi X'e fırlatıldı! 🎉", flush=True)
+            print(f"[{saat_log}] ZERNIO BAŞARILI! 🎉", flush=True)
         else:
-            print(f"[{saat_log}] ZERNIO HATA: {response.status_code} - {response.text}", flush=True)
-            
+            print(f"[{saat_log}] ZERNIO HATA: {response.status_code}", flush=True)
     except Exception as e:
-        print(f"[{datetime.now(TR_TZ).strftime('%H:%M:%S')}] ZERNIO BAĞLANTI HATASI: {e}", flush=True)
+        print(f"[{saat_log}] Bağlantı hatası: {e}", flush=True)
 
 def check_matches():
     try:
@@ -100,70 +71,53 @@ def check_matches():
             return
         
         matches = response.json().get('response', [])
-        print(f"[{datetime.now(TR_TZ).strftime('%H:%M:%S')}] {len(matches)} canlı maç kontrol edildi.", flush=True)
+        saat_simdi = datetime.now(TR_TZ).strftime('%H:%M:%S')
+        print(f"[{saat_simdi}] API'den {len(matches)} canlı maç geldi.", flush=True)
         
         for match in matches:
-            league_id = match['league']['id']
-            if league_id not in LEAGUES:
-                continue
-                
-            fixture_id = match['fixture']['id']
             home = match['teams']['home']['name']
             away = match['teams']['away']['name']
-            score_home = match['goals']['home'] or 0
-            score_away = match['goals']['away'] or 0
-            status = match['fixture']['status']['short']
-            minute = match['fixture']['status']['elapsed'] or 0
-            current_score = f"{score_home}-{score_away}"
-
-            hashtag = generate_hashtag(home, away)
+            
+            # Lig ID'sini sildik, sadece takımlarımıza bakıyoruz
             home_tag = get_team_tag(home)
             away_tag = get_team_tag(away)
-            tags = " ".join(filter(None, [home_tag, away_tag]))
 
-            # Gol tespiti
-            prev_score = last_scores.get(fixture_id)
-            if prev_score and prev_score != current_score and status not in ['FT', 'AET', 'PEN']:
-                goal_scorer = "Bilinmiyor"
-                events = match.get('events', [])
-                for event in reversed(events):
-                    if event['type'] == 'Goal':
-                        goal_scorer = event['player']['name']
-                        break
-                tweet = f"⚽ {minute}' GOOOL! {home} {current_score} {away} ({goal_scorer})\n{hashtag} {tags}"
-                send_tweet(tweet)
+            if home_tag or away_tag:
+                fixture_id = match['fixture']['id']
+                score_home = match['goals']['home'] or 0
+                score_away = match['goals']['away'] or 0
+                current_score = f"{score_home}-{score_away}"
+                status = match['fixture']['status']['short']
+                minute = match['fixture']['status']['elapsed'] or 0
 
-            # Maç sonu
-            if status == 'FT' and fixture_id not in processed_matches:
-                goller = []
-                for event in match.get('events', []):
-                    if event['type'] == 'Goal':
-                        dak = event['time']['elapsed']
-                        ekstra = event['time']['extra'] or 0
-                        dak_str = f"{dak}+{ekstra}'" if ekstra else f"{dak}'"
-                        goller.append(f"{event['player']['name']} {dak_str}")
-                gol_text = "\nGoller: " + ", ".join(goller) if goller else ""
-                tweet = f"🏁 MAÇ SONUUU!\n{home} {score_home}-{score_away} {away}{gol_text}\n{hashtag} {tags}"
-                send_tweet(tweet)
-                processed_matches.add(fixture_id)
+                # Gol tespiti
+                prev_score = last_scores.get(fixture_id)
+                if prev_score and prev_score != current_score and status not in ['FT', 'AET', 'PEN']:
+                    goal_scorer = "Bilinmiyor"
+                    events = match.get('events', [])
+                    for event in reversed(events):
+                        if event['type'] == 'Goal':
+                            goal_scorer = event['player']['name']
+                            break
+                    tweet = f"⚽ {minute}' GOOOL! {home} {current_score} {away} ({goal_scorer})\n#CanlıSkor {home_tag or ''} {away_tag or ''}"
+                    send_tweet(tweet)
 
-            last_scores[fixture_id] = current_score
+                # Maç sonu
+                if status == 'FT' and fixture_id not in processed_matches:
+                    tweet = f"🏁 MAÇ SONU: {home} {score_home}-{score_away} {away}\n#MaçSonu {home_tag or ''} {away_tag or ''}"
+                    send_tweet(tweet)
+                    processed_matches.add(fixture_id)
+
+                last_scores[fixture_id] = current_score
 
     except Exception as e:
         print(f"Genel hata: {e}", flush=True)
 
-# 90 SANİYEDE BİR KONTROL
 schedule.every(90).seconds.do(check_matches)
 
 if __name__ == "__main__":
-    print("Sistem başlatılıyor...", flush=True)
+    print("Sistem başlatıldı (Geniş tarama aktif)...", flush=True)
     keep_alive()
-    
-    # Test tweetini KİLİTLEDİK! Sadece Render loglarında sessizce bilgi verecek.
-    su_an = datetime.now(TR_TZ).strftime("%H:%M:%S")
-    print(f"[{su_an}] Bot sessizce uyandı. Sadece gol olduğunda tweet atılacak.", flush=True)
-    
-    print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     while True:
         schedule.run_pending()
         time.sleep(1)
