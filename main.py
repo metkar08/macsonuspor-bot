@@ -2,10 +2,13 @@ import requests
 import time
 import schedule
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # Render'ı uyanık tutacak web sunucusu modülü
 from keep_alive import keep_alive
+
+# --- TÜRKİYE SAAT DİLİMİ (UTC+3) ---
+TR_TZ = timezone(timedelta(hours=3))
 
 # --- API ANAHTARLARI ---
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
@@ -54,10 +57,13 @@ def generate_hashtag(home, away):
     return f"#{home_short}{away_short}"
 
 def send_tweet(text):
-    print(f"[{datetime.now()}] Zernio üzerinden Yayınlama yapılıyor: {text[:50]}...", flush=True)
+    # Loglarda da Türkiye saatini görebilmek için TR_TZ kullanıyoruz
+    saat_log = datetime.now(TR_TZ).strftime('%H:%M:%S')
+    print(f"[{saat_log}] Zernio üzerinden CANLI yayınlama yapılıyor...", flush=True)
+    
     try:
         if not ZERNIO_API_KEY:
-            print(f"[{datetime.now()}] UYARI: ZERNIO_API_KEY Render'da tanımlı değil!", flush=True)
+            print(f"[{saat_log}] UYARI: ZERNIO_API_KEY Render'da tanımlı değil!", flush=True)
             return
 
         headers = {
@@ -65,14 +71,14 @@ def send_tweet(text):
             "Content-Type": "application/json"
         }
         
-        # Zernio'nun beklediği tam yayınlama formatı
+        # Zernio Dokümantasyonuna uygun (camelCase) garantili yayınlama komutu
         payload = {
             "content": text,
-            "status": "published",  # Taslak yerine doğrudan yayınla
+            "publishNow": True,  # Alt tire yok, 'N' büyük! Zernio'nun sevdiği format bu.
             "platforms": [
                 {
                     "platform": "twitter",
-                    "accountId": "69ef66bb985e734bf3c0b515" # Senin özel hesap ID'n
+                    "accountId": "69ef66bb985e734bf3c0b515"
                 }
             ]
         }
@@ -80,23 +86,23 @@ def send_tweet(text):
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers)
         
         if response.status_code in [200, 201]:
-            print(f"[{datetime.now()}] ZERNIO BAŞARILI: Tweet X'e fırlatıldı! 🎉", flush=True)
+            print(f"[{saat_log}] ZERNIO BAŞARILI: Gönderi X'e fırlatıldı! 🎉", flush=True)
         else:
-            print(f"[{datetime.now()}] ZERNIO HATA: {response.status_code} - {response.text}", flush=True)
+            print(f"[{saat_log}] ZERNIO HATA: {response.status_code} - {response.text}", flush=True)
             
     except Exception as e:
-        print(f"[{datetime.now()}] ZERNIO BAĞLANTI HATASI: {e}", flush=True)
+        print(f"[{datetime.now(TR_TZ).strftime('%H:%M:%S')}] ZERNIO BAĞLANTI HATASI: {e}", flush=True)
 
 def check_matches():
     try:
         url = f"{BASE_URL}/fixtures/live"
         response = requests.get(url, headers=HEADERS)
         if response.status_code != 200:
-            print(f"API hatası: {response.status_code} - {response.text}", flush=True)
+            print(f"API hatası: {response.status_code}", flush=True)
             return
         
         matches = response.json().get('response', [])
-        print(f"[{datetime.now()}] {len(matches)} canlı maç kontrol edildi.", flush=True)
+        print(f"[{datetime.now(TR_TZ).strftime('%H:%M:%S')}] {len(matches)} canlı maç kontrol edildi.", flush=True)
         
         for match in matches:
             league_id = match['league']['id']
@@ -148,19 +154,18 @@ def check_matches():
     except Exception as e:
         print(f"Genel hata: {e}", flush=True)
 
-# 3 DAKİKADA BİR KONTROL (Kredileri korumak ve güvenli yayın için)
-schedule.every(3).minutes.do(check_matches)
+# 90 SANİYEDE BİR KONTROL
+schedule.every(90).seconds.do(check_matches)
 
 if __name__ == "__main__":
-    print("Sistem başlatılıyor (3 dakikalık döngü aktif)...", flush=True)
-    
+    print("Sistem başlatılıyor...", flush=True)
     keep_alive()
     
-    # Sistemin ayağa kalktığını göstermek için ilk mesaj
-    su_an = datetime.now().strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor sistemi aktif edildi! [{su_an}] ⚽ Canlı skor takibi ve otomatik yayınlama devrede.")
+    # Türkiye saatini alıp metne ekliyoruz
+    su_an = datetime.now(TR_TZ).strftime("%H:%M:%S")
+    send_tweet(f"🤖 @macsonuspor sistemi aktif! [{su_an}] ⚽ Maç skorları 90 saniyede bir kontrol ediliyor.")
     
-    print("Bot döngüye girdi, maçlar 3 dakikada bir kontrol ediliyor...", flush=True)
+    print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     while True:
         schedule.run_pending()
         time.sleep(1)
