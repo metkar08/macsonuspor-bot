@@ -65,15 +65,22 @@ def send_tweet(text):
             "Content-Type": "application/json"
         }
         
-        # Hata veren platforms kısmını kaldırdık. Direkt content gönderiyoruz.
+        # Zernio'nun istediği kusursuz format: Taslağa atma, direkt yayınla!
         payload = {
-            "content": text
+            "content": text,
+            "status": "published",  
+            "platforms": [
+                {
+                    "platform": "twitter",
+                    "accountId": "69ef66bb985e734bf3c0b515"
+                }
+            ]
         }
         
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers)
         
         if response.status_code in [200, 201]:
-            print(f"[{datetime.now()}] ZERNIO BAŞARILI: Mesaj hedefe ulaştı! 🎉", flush=True)
+            print(f"[{datetime.now()}] ZERNIO BAŞARILI: Mesaj hedefe ulaştı ve yayınlandı! 🎉", flush=True)
         else:
             print(f"[{datetime.now()}] ZERNIO HATA: {response.status_code} - {response.text}", flush=True)
             
@@ -151,7 +158,7 @@ if __name__ == "__main__":
     
     # Sistemin ayağa kalktığını göstermek için Zernio üzerinden ilk test mesajı
     su_an = datetime.now().strftime("%H:%M:%S")
-    send_tweet(f"🤖 @macsonuspor bot sistemi Zernio altyapısı ile aktif edildi! [{su_an}] ⚽ Canlı skor takibi devrede.")
+    send_tweet(f"🤖 @macsonuspor bot sistemi Zernio altyapısı ile tam otomatik aktif edildi! [{su_an}] ⚽")
     
     print("Bot döngüye girdi, maçlar takip ediliyor...", flush=True)
     while True:
