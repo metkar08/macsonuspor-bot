@@ -148,8 +148,8 @@ def check_matches():
     except Exception as e:
         print(f"Genel hata: {e}", flush=True)
 
-# Her 45 saniyede kontrol
-schedule.every(45).seconds.do(check_matches)
+# Her 90 saniyede kontrol
+schedule.every(90).seconds.do(check_matches)
 
 if __name__ == "__main__":
     print("Sistem başlatılıyor...", flush=True)
