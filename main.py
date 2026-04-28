@@ -7,37 +7,29 @@ from keep_alive import keep_alive
 
 # --- AYARLAR ---
 TR_TZ = timezone(timedelta(hours=3))
+
+# Render'daki Değişken İsimleri
 FOOTBALL_API_KEY = os.environ.get('FOOTBALL_API_KEY')
 ZERNIO_API_KEY = os.environ.get('ZERNIO_API_KEY')
 ZERNIO_API_URL = os.environ.get('ZERNIO_API_URL', 'https://api.zernio.com/v1/posts')
-TWITTER_ACCOUNT_ID = "69ef66bb985e734bf3c0b515" # Senin Zernio Twitter ID'n
+TWITTER_ACCOUNT_ID = "69ef66bb985e734bf3c0b515"
 
-# --- API-SPORTS AYARLARI ---
+# --- API-SPORTS AYARLARI (DOĞRUDAN BAĞLANTI) ---
 BASE_URL = "https://v3.football.api-sports.io"
-HEADERS = {
-    'x-rapidapi-key': FOOTBALL_API_KEY,
-    'x-rapidapi-host': 'v3.football.api-sports.io'
-}
 
 # --- HAFIZA ---
 last_scores = {}
 processed_matches = set()
 LAST_CLEANUP = datetime.now(TR_TZ).date()
 
-# --- GENİŞLETİLMİŞ TAKIM LİSTESİ (Süper Lig + Avrupa Devleri) ---
+# --- TAKIM LİSTESİ ---
 TEAM_TAGS = {
-    # TÜRKİYE SÜPER LİG (19 Takım)
     "Fenerbahce": "@Fenerbahce", "Galatasaray": "@GalatasaraySK", "Besiktas": "@Besiktas", "Trabzonspor": "@Trabzonspor",
     "Konyaspor": "@Konyaspor", "Samsunspor": "@Samsunspor", "Goztepe": "@Goztepe", "Alanyaspor": "@Alanyaspor",
     "Antalyaspor": "@Antalyaspor", "Basaksehir": "@Basaksehir_FK", "Adana Demirspor": "@AdanaDemirspor",
-    "Kasımpaşa": "@kasimpasa", "Sivasspor": "@Sivasspor", "Rizespor": "@CRizesporAS", "Kayserispor": "@KayserisporFK",
+    "Kasimpasa": "@kasimpasa", "Sivasspor": "@Sivasspor", "Rizespor": "@CRizesporAS", "Kayserispor": "@KayserisporFK",
     "Gaziantep": "@GaziantepFK", "Hatayspor": "@Hatayspor_FK", "Eyupspor": "@eyupspor", "Bodrum": "@BodrumFK",
-
-    # AVRUPA DEVLERİ
-    "Real Madrid": "@realmadrid", "Barcelona": "@FCBarcelona", "Atletico Madrid": "@Atleti",
-    "Manchester City": "@ManCity", "Liverpool": "@LFC", "Arsenal": "@Arsenal", "Manchester United": "@ManUtd",
-    "Bayern Munich": "@FCBayern", "Borussia Dortmund": "@BVB", "Bayer Leverkusen": "@bayer04fussball",
-    "Paris Saint Germain": "@PSG_inside", "Inter": "@Inter", "Milan": "@acmilan", "Juventus": "@juventusfc"
+    "Real Madrid": "@realmadrid", "Barcelona": "@FCBarcelona", "Manchester City": "@ManCity", "Liverpool": "@LFC"
 }
 
 def normalize_string(s):
@@ -56,25 +48,23 @@ def get_team_tag(team_name):
 def send_tweet(text):
     if len(text) > 275:
         text = text[:272] + "..."
-    
     saat_log = datetime.now(TR_TZ).strftime('%H:%M:%S')
-    for attempt in range(3):
-        try:
-            headers = {"Authorization": f"Bearer {ZERNIO_API_KEY}", "Content-Type": "application/json"}
-            payload = {
-                "content": text,
-                "publishNow": True,
-                "platforms": [{"platform": "twitter", "accountId": TWITTER_ACCOUNT_ID}]
-            }
-            response = requests.post(ZERNIO_API_URL, json=payload, headers=headers, timeout=15)
-            if response.status_code in [200, 201]:
-                print(f"[{saat_log}] TWEET BAŞARILI! 🎉", flush=True)
-                return True
-            time.sleep(3)
-        except Exception as e:
-            print(f"[{saat_log}] Hata: {e}", flush=True)
-            time.sleep(3)
-    return False
+    try:
+        headers = {
+            "Authorization": f"Bearer {ZERNIO_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "content": text,
+            "publishNow": True,
+            "platforms": [{"platform": "twitter", "accountId": TWITTER_ACCOUNT_ID}]
+        }
+        response = requests.post(ZERNIO_API_URL, json=payload, headers=headers, timeout=15)
+        print(f"[{saat_log}] Zernio Durumu: {response.status_code}", flush=True)
+        return response.status_code in [200, 201]
+    except Exception as e:
+        print(f"Tweet Hatası: {e}", flush=True)
+        return False
 
 def check_matches():
     global LAST_CLEANUP, last_scores, processed_matches
@@ -87,15 +77,21 @@ def check_matches():
         LAST_CLEANUP = bugun
 
     try:
+        # DOĞRUDAN API-SPORTS HEADER YAPISI
+        headers = {
+            'x-apisports-key': FOOTBALL_API_KEY
+        }
+
         url = f"{BASE_URL}/fixtures/live"
-        response = requests.get(url, headers=HEADERS, timeout=15)
-        
-        if response.status_code != 200:
-            data = response.json()
-            print(f"API Hatası ({response.status_code}): {data.get('errors')}", flush=True)
+        response = requests.get(url, headers=headers, timeout=15)
+        data = response.json()
+
+        # API Hata Kontrolü
+        if data.get('errors') and len(data['errors']) > 0:
+            print(f"⚠️ API-SPORTS HATASI: {data['errors']}", flush=True)
             return
-        
-        matches = response.json().get('response', [])
+
+        matches = data.get('response', [])
         saat_simdi = datetime.now(TR_TZ).strftime('%H:%M:%S')
         
         found_tracked_match = False
@@ -115,12 +111,11 @@ def check_matches():
                 status = match['fixture']['status']['short']
                 minute = match['fixture']['status']['elapsed'] or 0
 
-                print(f"[{saat_simdi}] Takipte: {home_name} {current_score} {away_name}", flush=True)
-
                 prev_score = last_scores.get(fixture_id)
                 
                 # GOL TESPİTİ
                 if prev_score and prev_score != current_score and status not in ['FT', 'AET', 'PEN']:
+                    print(f"⚽ [{saat_simdi}] GOL! {home_name} {current_score} {away_name}", flush=True)
                     goal_scorer = "Gol!"
                     events = match.get('events', [])
                     for event in reversed(events or []):
@@ -133,6 +128,7 @@ def check_matches():
 
                 # MAÇ SONU TESPİTİ
                 if status in ['FT', 'AET', 'PEN'] and fixture_id not in processed_matches:
+                    print(f"🏁 [{saat_simdi}] MAÇ SONU: {home_name} {score_home}-{score_away} {away_name}", flush=True)
                     tweet = f"🏁 MAÇ SONU: {home_name} {score_home}-{score_away} {away_name}\n#MaçSonu {home_tag or ''} {away_tag or ''}"
                     send_tweet(tweet)
                     processed_matches.add(fixture_id)
@@ -140,7 +136,7 @@ def check_matches():
                 last_scores[fixture_id] = current_score
         
         if not found_tracked_match:
-            print(f"[{saat_simdi}] {len(matches)} canlı maç var ama takibimizde kimse yok.", flush=True)
+            print(f"[{saat_simdi}] {len(matches)} canlı maç var ama takip listemizde değiller.", flush=True)
 
     except Exception as e:
         print(f"Döngü hatası: {e}", flush=True)
@@ -149,7 +145,7 @@ def check_matches():
 schedule.every(90).seconds.do(check_matches)
 
 if __name__ == "__main__":
-    print("--- MacSonuSpor V1 - Elite Edition Aktif ---", flush=True)
+    print("--- MacSonuSpor V1 Elite (Direct API) Aktif ---", flush=True)
     keep_alive()
     check_matches() # Hemen ilk kontrol
     while True:
