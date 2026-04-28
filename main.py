@@ -21,6 +21,7 @@ processed_matches = set()
 
 # --- TAKIM LİSTESİ ---
 TEAM_TAGS = {
+    "Farul Constanta": "#TestGol", "Universitatea Craiova": "#TestGol"
     "Fenerbahçe": "@Fenerbahce", "Galatasaray": "@GalatasaraySK", "Beşiktaş": "@Besiktas", "Trabzonspor": "@Trabzonspor",
     "Samsunspor": "@Samsunspor", "Göztepe": "@Goztepe", "Real Madrid": "@realmadrid", "Manchester City": "@ManCity"
 }
