@@ -20,10 +20,18 @@ last_scores = {}
 processed_matches = set()
 
 # --- TAKIM LİSTESİ ---
+# --- TAKIM LİSTESİ ---
 TEAM_TAGS = {
-    "Farul Constanta": "#TestGol", "Universitatea Craiova": "#TestGol"
-    "Fenerbahçe": "@Fenerbahce", "Galatasaray": "@GalatasaraySK", "Beşiktaş": "@Besiktas", "Trabzonspor": "@Trabzonspor",
-    "Samsunspor": "@Samsunspor", "Göztepe": "@Goztepe", "Real Madrid": "@realmadrid", "Manchester City": "@ManCity"
+    "Fenerbahçe": "@Fenerbahce", 
+    "Galatasaray": "@GalatasaraySK", 
+    "Beşiktaş": "@Besiktas", 
+    "Trabzonspor": "@Trabzonspor",
+    "Samsunspor": "@Samsunspor", 
+    "Göztepe": "@Goztepe", 
+    "Real Madrid": "@realmadrid", 
+    "Manchester City": "@ManCity",
+    "Farul Constanta": "#TestGol", 
+    "Univ. Craiova": "#TestGol"
 }
 
 def send_tweet(text):
