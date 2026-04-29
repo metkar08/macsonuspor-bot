@@ -21,35 +21,47 @@ TWITTER_ACCOUNT_ID = "69ef66bb985e734bf3c0b515"
 
 # Ortam değişkeni güvenliği
 if not ZERNIO_API_KEY or not FOOTBALL_DATA_KEY:
-    print("!!! KRİTİK HATA: API Anahtarları Render panelinde tanımlanmamış !!!", flush=True)
+    print("!!! KRİTİK HATA: API Anahtarları eksik !!!", flush=True)
 
 # --- HAFIZA ---
 last_scores = {}
 
-# --- TAKIM LİSTESİ (Küçük harf ve Türkçe karaktersiz) ---
+# --- GENİŞLETİLMİŞ TAKIM VE LİG LİSTESİ ---
+# Buraya eklediğin her anahtar kelime (küçük harf) takip edilir.
 TEAM_TAGS = {
+    # Yerel Takımlar
     "fenerbahce": "@Fenerbahce", 
     "galatasaray": "@GalatasaraySK", 
     "besiktas": "@Besiktas", 
     "trabzonspor": "@Trabzonspor",
     "samsunspor": "@Samsunspor", 
     "goztepe": "@Goztepe",
+    
+    # Şampiyonlar Ligi ve Devler
+    "atletico": "#Atleti #UCL",
+    "arsenal": "@Arsenal #UCL",
+    "real madrid": "#HalaMadrid #UCL",
+    "bayern": "#FCBayern #UCL",
+    "manchester city": "#ManCity #UCL",
+    "psg": "#PSG #UCL",
+    "barcelona": "#Barca #UCL",
+    "dortmund": "#BVB #UCL",
+    
+    # Testler
     "farul": "#TestGol",
     "craiova": "#TestGol"
 }
 
 def normalize_text(text):
-    """Metni temizler, Türkçe karakterleri İngilizceye çevirir ve küçük harf yapar."""
+    """Metni temizler ve Türkçe karakterleri İngilizceye çevirir."""
     if not text:
         return ""
-    # Türkçe karakter eşleşmeleri
     text = text.replace('I', 'i').replace('İ', 'i').replace('ı', 'i')
-    # Diğer aksanları temizle (ç -> c, ş -> s vb.)
     nfkd_form = unicodedata.normalize('NFKD', text)
     return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower()
 
 def send_tweet(text):
-    """Zernio üzerinden tweet gönderir ve uzunluk kontrolü yapar."""
+    """Zernio üzerinden tweet gönderir."""
     if len(text) > 280:
         text = text[:277] + "..."
         
@@ -65,12 +77,11 @@ def send_tweet(text):
     }
     
     try:
-        # Retry (Yeniden deneme) mekanizması olmadan tekil sağlam istek
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers, timeout=15)
         print(f"[{saat_log}] Tweet Durumu: {response.status_code}", flush=True)
         return response.status_code in [200, 201]
     except Exception as e:
-        print(f"[{saat_log}] Tweet gönderim hatası: {e}", flush=True)
+        print(f"[{saat_log}] Tweet hatası: {e}", flush=True)
         return False
 
 def check_scores():
@@ -90,7 +101,6 @@ def check_scores():
         
         found_tracked = False
         for match in matches:
-            # Takım isimlerini al (None kontrolü ile)
             home_raw = match.get('homeTeam', {}).get('name', "")
             away_raw = match.get('awayTeam', {}).get('name', "")
             match_id = str(match.get('id', ""))
@@ -98,50 +108,45 @@ def check_scores():
             if not home_raw or not away_raw or not match_id:
                 continue
 
-            # Normalizasyon (Türkçe karakterleri çözme)
             home_norm = normalize_text(home_raw)
             away_norm = normalize_text(away_raw)
             
-            # Skor verilerini çek (Safe/Güvenli çekim)
             score_data = match.get('score', {}).get('fullTime', {})
             h_score = score_data.get('home')
             a_score = score_data.get('away')
 
-            # Eğer skorlardan biri None ise henüz veri gelmemiştir, atla
             if h_score is None or a_score is None:
                 continue
                 
             current_score = f"{h_score}-{a_score}"
             
-            # TEAM_TAGS içindeki anahtarların takım isimlerinde geçip geçmediğine bak
+            # Takım veya Lig etiketi eşleşmesi
             h_tag = next((tag for name, tag in TEAM_TAGS.items() if name in home_norm), None)
             a_tag = next((tag for name, tag in TEAM_TAGS.items() if name in away_norm), None)
 
             if h_tag or a_tag:
                 found_tracked = True
-                # GOL KONTROLÜ: Hafızada maç varsa ve skor değişmişse
+                # GOL TESPİTİ
                 if match_id in last_scores:
                     if last_scores[match_id] != current_score:
-                        print(f"⚽ GOL TESPİTİ: {home_raw} {current_score} {away_raw}", flush=True)
+                        print(f"⚽ GOL: {home_raw} {current_score} {away_raw}", flush=True)
                         msg = f"⚽ GOOOL! {home_raw} {current_score} {away_raw}\n#CanlıSkor {h_tag or ''} {a_tag or ''}"
                         send_tweet(msg)
                 
-                # Skoru her durumda güncelle
                 last_scores[match_id] = current_score
 
         if not found_tracked:
-            print(f"[{saat_simdi}] {len(matches)} maç taranıyor, listemizde maç yok.", flush=True)
+            print(f"[{saat_simdi}] {len(matches)} canlı maç taranıyor, takibimizde maç yok.", flush=True)
 
     except Exception as e:
         print(f"[{saat_simdi}] API Hatası: {e}", flush=True)
 
-# 60 saniyede bir döngüyü çalıştır
+# 60 saniyede bir kontrol
 schedule.every(60).seconds.do(check_scores)
 
 if __name__ == "__main__":
-    print("--- MacSonuSpor V5.1 (Stable Engine) Aktif ---", flush=True)
+    print("--- MacSonuSpor V5.2 (UCL & Stable) Aktif ---", flush=True)
     keep_alive()
-    # İlk çalıştırmayı hemen yap
     check_scores()
     
     while True:
