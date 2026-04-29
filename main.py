@@ -15,7 +15,7 @@ TWITTER_ACCOUNT_ID = "69ef66bb985e734bf3c0b515"
 # --- HAFIZA ---
 last_scores = {}
 
-# --- TAKIM LİSTESİ (API'deki İngilizce isimlere göre eşleşir) ---
+# --- TAKIM LİSTESİ ---
 TEAM_TAGS = {
     "Fenerbahce": "@Fenerbahce", 
     "Galatasaray": "@GalatasaraySK", 
@@ -37,7 +37,7 @@ def send_tweet(text):
             "platforms": [{"platform": "twitter", "accountId": TWITTER_ACCOUNT_ID}]
         }
         response = requests.post(ZERNIO_API_URL, json=payload, headers=headers, timeout=10)
-        print(f"[{saat_log}] Tweet Gönderildi! Durum: {response.status_code}", flush=True)
+        print(f"[{saat_log}] Tweet Durumu: {response.status_code}", flush=True)
         return response.status_code in [200, 201]
     except Exception as e:
         print(f"Tweet hatası: {e}", flush=True)
@@ -50,7 +50,7 @@ def check_scores():
     try:
         url = "https://api.football-data.org/v4/matches"
         headers = {'X-Auth-Token': FOOTBALL_DATA_KEY}
-        params = {'status': 'LIVE'} # Sadece canlı maçları getir
+        params = {'status': 'LIVE'}
         
         response = requests.get(url, headers=headers, params=params, timeout=15)
         
@@ -67,12 +67,10 @@ def check_scores():
             away_team = match['awayTeam']['name']
             match_id = str(match['id'])
             
-            # Skor bilgileri
             h_score = match['score']['fullTime']['home']
             a_score = match['score']['fullTime']['away']
             current_score = f"{h_score}-{a_score}"
             
-            # Eşleşme kontrolü
             h_tag = next((tag for name, tag in TEAM_TAGS.items() if name.lower() in home_team.lower()), None)
             a_tag = next((tag for name, tag in TEAM_TAGS.items() if name.lower() in away_team.lower()), None)
 
@@ -80,7 +78,6 @@ def check_scores():
                 found_tracked = True
                 print(f"[{saat_simdi}] Takipte: {home_team} {current_score} {away_team}", flush=True)
 
-                # GOL KONTROLÜ
                 if match_id in last_scores and last_scores[match_id] != current_score:
                     print(f"⚽ GOL TESPİT EDİLDİ!", flush=True)
                     tweet = f"⚽ GOOOL! {home_team} {current_score} {away_team}\n#CanlıSkor {h_tag or ''} {a_tag or ''}"
@@ -89,12 +86,11 @@ def check_scores():
                 last_scores[match_id] = current_score
 
         if not found_tracked:
-            print(f"[{saat_simdi}] {len(matches)} canlı maç var, bizimkiler henüz sahada değil.", flush=True)
+            print(f"[{saat_simdi}] {len(matches)} canlı maç taranıyor, bizimkiler sahada değil.", flush=True)
 
     except Exception as e:
         print(f"Hata: {e}", flush=True)
 
-# Ücretsiz plan saniyede çok istek kabul etmez, 60 saniye idealdir
 schedule.every(60).seconds.do(check_scores)
 
 if __name__ == "__main__":
